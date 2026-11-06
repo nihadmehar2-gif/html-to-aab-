@@ -8,5 +8,8 @@
     "build": "npm run build --prefix frontend",
     "typecheck:api": "tsc --noEmit -p api/tsconfig.json"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "libsodium-wrappers": "^0.7.13"
+  }
 }
