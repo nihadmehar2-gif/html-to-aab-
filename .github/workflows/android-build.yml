@@ -1,0 +1,185 @@
+name: android-build
+
+# Web2APK Studio — real Android build worker.
+# Triggered by the serverless API after an encrypted payload is staged on the
+# "jobs" branch. Builds a genuine Capacitor Android project with Gradle and
+# produces installable APK / Play-ready AAB artifacts.
+
+run-name: "web2apk ${{ github.event.inputs.jobId }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      jobId:
+        description: "Web2APK build job id (uuid)"
+        required: true
+        type: string
+      secretName:
+        description: "Name of the Actions secret holding the payload key"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: web2apk-${{ github.event.inputs.jobId }}
+  cancel-in-progress: false
+
+jobs:
+  build-android:
+    name: Build & sign Android app
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      JOB_ID: ${{ github.event.inputs.jobId }}
+      JOB_SECRET_KEY: ${{ secrets[github.event.inputs.secretName] }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      OWNER: ${{ github.repository_owner }}
+      REPO: ${{ github.event.repository.name }}
+      JOBS_BRANCH: jobs
+      ARTIFACT_RETENTION_DAYS: ${{ vars.ARTIFACT_RETENTION_DAYS || '14' }}
+    steps:
+      - name: Checkout build worker
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+
+      - name: "Step 1/13 — Receive & stage build payload"
+        run: |
+          node build-worker/report.js --init
+          node build-worker/report.js --step 1 --status running
+          node build-worker/fetch-job.js
+          node build-worker/export-env.js
+          node build-worker/report.js --step 1 --status done --log "Payload decrypted and staged on the runner"
+
+      - name: "Step 2/13 — Validate & extract web assets"
+        run: |
+          node build-worker/report.js --step 2 --status running
+          node build-worker/validate-zip.js work/site.zip
+          node build-worker/extract.js work/site.zip site
+          node build-worker/report.js --step 2 --status done --log "Web assets validated (no path traversal, no zip bomb) and extracted"
+
+      - name: "Step 3/13 — Prepare Capacitor project"
+        run: |
+          node build-worker/report.js --step 3 --status running
+          node build-worker/create-project.js 2>&1 | tee -a prepare.log
+          node build-worker/report.js --step 3 --status done --log-file prepare.log
+
+      - name: "Step 4/13 — Add Android platform"
+        run: |
+          node build-worker/report.js --step 4 --status running
+          cd app
+          npx cap add android 2>&1 | tee ../platform.log
+          npx cap sync android 2>&1 | tee -a ../platform.log
+          node ../build-worker/report.js --step 4 --status done --log-file ../platform.log
+
+      - name: "Step 5/13 — Generate icon & splash"
+        run: |
+          node build-worker/report.js --step 5 --status running
+          node build-worker/generate-assets.js 2>&1 | tee -a assets.log
+          node build-worker/report.js --step 5 --status done --log-file assets.log
+
+      - name: "Step 6/13 — Apply permissions & manifest"
+        run: |
+          node build-worker/report.js --step 6 --status running
+          node build-worker/apply-android.js
+          node build-worker/report.js --step 6 --status done --log "Permissions, orientation, colors and WebView settings applied"
+
+      - name: "Step 7/13 — Configure signing"
+        run: |
+          node build-worker/report.js --step 7 --status running
+          node build-worker/apply-signing.js
+          node build-worker/report.js --step 7 --status done --log "Gradle signing configured"
+
+      - name: "Step 8/13 — Compile APK (Gradle)"
+        if: ${{ env.BUILD_APK == 'true' }}
+        run: |
+          node build-worker/report.js --step 8 --status running
+          cd app/android
+          chmod +x gradlew
+          ./gradlew -no-daemon --stacktrace assembleRelease $DEBUG_TASKS 2>&1 | tee -a gradle-apk.log
+          node ../../build-worker/report.js --step 8 --status done --log-file gradle-apk.log
+
+      - name: "Step 9/13 — Compile AAB (Gradle)"
+        if: ${{ env.BUILD_AAB == 'true' }}
+        run: |
+          node build-worker/report.js --step 9 --status running
+          cd app/android
+          ./gradlew -no-daemon --stacktrace bundleRelease 2>&1 | tee -a gradle-aab.log
+          node ../../build-worker/report.js --step 9 --status done --log-file gradle-aab.log
+
+      - name: "Step 10/13 — Sign & verify artifacts"
+        run: |
+          node build-worker/report.js --step 10 --status running
+          node build-worker/collect-artifacts.js 2>&1 | tee -a verify.log
+          node build-worker/report.js --step 10 --status done --log-file verify.log
+
+      - name: "Step 11/13 — Upload build artifacts (start)"
+        run: node build-worker/report.js --step 11 --status running
+
+      - name: Upload APK artifact
+        if: hashFiles('dist/*.apk') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: "w2a-apk-${{ github.event.inputs.jobId }}"
+          path: dist/*.apk
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: ignore
+
+      - name: Upload AAB artifact
+        if: hashFiles('dist/*.aab') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: "w2a-aab-${{ github.event.inputs.jobId }}"
+          path: dist/*.aab
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: ignore
+
+      - name: Upload debug APK artifact
+        if: hashFiles('dist/*-debug.apk') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: "w2a-debug-${{ github.event.inputs.jobId }}"
+          path: dist/*-debug.apk
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: ignore
+
+      - name: Upload encrypted keystore artifact (generated keys only)
+        if: hashFiles('dist/keystore.enc') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: "w2a-keystore-${{ github.event.inputs.jobId }}"
+          path: dist/keystore.enc
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: ignore
+
+      - name: "Step 11/13 — Upload build artifacts (done)"
+        if: always()
+        run: node build-worker/report.js --step 11 --status done --log "Artifacts uploaded to GitHub Actions" || true
+
+      - name: "Step 12/13 — Finalize build status"
+        if: success()
+        run: node build-worker/report.js --done --log "Build finished successfully"
+
+      - name: "Step 13/13 — Clean up sensitive data"
+        if: always()
+        run: |
+          rm -rf work site app/android/keystore.jks app/android/keystore.properties dist/keystore.enc || true
+          node build-worker/report.js --step 13 --status done --log "Runner workspace cleaned; encrypted payload + job key removed" || true
+
+      - name: "Report failure"
+        if: failure()
+        run: node build-worker/report.js --fail --error "One or more build steps failed — check the failing step below and its logs." || true

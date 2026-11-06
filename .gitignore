@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+frontend/node_modules/
+api/node_modules/
+
+# build output
+frontend/dist/
+*.tsbuildinfo
+
+# environment secrets — NEVER commit
+.env
+.env.local
+.env.*.local
+
+# keystores & signing material — NEVER commit
+*.jks
+*.keystore
+*.p12
+*.pem
+keys/
+work/
+dist-build/
+
+# platform
+.vercel
+.netlify
+.DS_Store
+*.log

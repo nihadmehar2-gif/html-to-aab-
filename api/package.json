@@ -1,0 +1,14 @@
+{
+  "name": "web2apk-studio-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Serverless backend for Web2APK Studio (Vercel + Netlify adapters share _lib/core.ts)",
+  "dependencies": {
+    "libsodium-wrappers": "^0.7.13"
+  },
+  "devDependencies": {
+    "@types/libsodium-wrappers": "^0.7.13",
+    "@types/node": "^20.14.10",
+    "typescript": "^5.5.3"
+  }
+}

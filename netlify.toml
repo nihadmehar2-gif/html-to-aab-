@@ -1,0 +1,47 @@
+# Web2APK Studio — Netlify deployment configuration
+# The frontend is a Vite SPA; serverless logic lives in netlify/functions
+# (thin adapters over api/_lib/core.ts, the same core used by Vercel).
+
+[build]
+  base = "frontend"
+  command = "npm install && npm run build"
+  publish = "dist"
+  functions = "../netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# API routes
+[[redirects]]
+  from = "/api/builds"
+  to = "/.netlify/functions/builds"
+  status = 200
+  force = true
+  methods = ["GET", "POST", "DELETE", "OPTIONS"]
+
+[[redirects]]
+  from = "/api/artifacts"
+  to = "/.netlify/functions/artifacts"
+  status = 200
+  force = true
+  methods = ["GET", "OPTIONS"]
+
+[[redirects]]
+  from = "/api/config"
+  to = "/.netlify/functions/config"
+  status = 200
+  force = true
+  methods = ["GET"]
+
+# SPA fallback (must stay last)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "SAMEORIGIN"

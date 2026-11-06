@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-navy-950 text-slate-200 antialiased;
+    background-image:
+      radial-gradient(1000px 500px at 15% -10%, rgba(109, 94, 248, 0.16), transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, rgba(59, 130, 246, 0.12), transparent 55%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-white/10 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-white/20;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/[0.04] border border-white/10 backdrop-blur-xl rounded-2xl shadow-card;
+  }
+  .glass-strong {
+    @apply bg-navy-850/80 border border-white/10 backdrop-blur-xl rounded-2xl shadow-card;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
+      transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60
+      disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn text-white bg-gradient-to-r from-brand-500 to-accent hover:shadow-glow
+      hover:brightness-110 active:scale-[0.98];
+  }
+  .btn-ghost {
+    @apply btn text-slate-300 hover:text-white hover:bg-white/5 border border-white/10;
+  }
+  .btn-danger {
+    @apply btn text-red-300 hover:text-white hover:bg-red-500/80 border border-red-500/30;
+  }
+  .input {
+    @apply w-full rounded-xl bg-navy-800/70 border border-white/10 px-3.5 py-2.5 text-sm text-slate-100
+      placeholder:text-slate-500 focus:outline-none focus:border-brand-400/60 focus:ring-2 focus:ring-brand-500/25 transition;
+  }
+  .label {
+    @apply block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-r from-brand-300 via-brand-400 to-accent bg-clip-text text-transparent;
+  }
+}

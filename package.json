@@ -1,0 +1,12 @@
+{
+  "name": "web2apk-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Convert HTML/ZIP websites into real, installable Android APK/AAB builds via GitHub Actions.",
+  "scripts": {
+    "dev": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "typecheck:api": "tsc --noEmit -p api/tsconfig.json"
+  },
+  "license": "MIT"
+}
