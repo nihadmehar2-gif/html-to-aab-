@@ -5,7 +5,7 @@ name: android-build
 # "jobs" branch. Builds a genuine Capacitor Android project with Gradle and
 # produces installable APK / Play-ready AAB artifacts.
 
-run-name: "web2apk ${{ github.event.inputs.jobId }}"
+run-name: "web2apk ${{ github.event.inputs.jobId || github.event.client_payload.jobId }}"
 
 on:
   workflow_dispatch:
@@ -18,12 +18,16 @@ on:
         description: "Name of the Actions secret holding the payload key"
         required: true
         type: string
+  # Fallback trigger — the repository_dispatch API only needs Contents:write,
+  # useful when the deployer's token cannot use the workflow_dispatch API.
+  repository_dispatch:
+    types: [web2apk-build]
 
 permissions:
   contents: write
 
 concurrency:
-  group: web2apk-${{ github.event.inputs.jobId }}
+  group: web2apk-${{ github.event.inputs.jobId || github.event.client_payload.jobId }}
   cancel-in-progress: false
 
 jobs:
@@ -32,8 +36,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      JOB_ID: ${{ github.event.inputs.jobId }}
-      JOB_SECRET_KEY: ${{ secrets[github.event.inputs.secretName] }}
+      JOB_ID: ${{ github.event.inputs.jobId || github.event.client_payload.jobId }}
+      SECRET_NAME: ${{ github.event.inputs.secretName || github.event.client_payload.secretName }}
+      JOB_SECRET_KEY: ${{ secrets[github.event.inputs.secretName || github.event.client_payload.secretName] }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       OWNER: ${{ github.repository_owner }}
       REPO: ${{ github.event.repository.name }}
@@ -134,7 +139,7 @@ jobs:
         if: hashFiles('dist/*.apk') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: "w2a-apk-${{ github.event.inputs.jobId }}"
+          name: "w2a-apk-${{ env.JOB_ID }}"
           path: dist/*.apk
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
           if-no-files-found: ignore
@@ -143,7 +148,7 @@ jobs:
         if: hashFiles('dist/*.aab') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: "w2a-aab-${{ github.event.inputs.jobId }}"
+          name: "w2a-aab-${{ env.JOB_ID }}"
           path: dist/*.aab
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
           if-no-files-found: ignore
@@ -152,7 +157,7 @@ jobs:
         if: hashFiles('dist/*-debug.apk') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: "w2a-debug-${{ github.event.inputs.jobId }}"
+          name: "w2a-debug-${{ env.JOB_ID }}"
           path: dist/*-debug.apk
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
           if-no-files-found: ignore
@@ -161,7 +166,7 @@ jobs:
         if: hashFiles('dist/keystore.enc') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: "w2a-keystore-${{ github.event.inputs.jobId }}"
+          name: "w2a-keystore-${{ env.JOB_ID }}"
           path: dist/keystore.enc
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
           if-no-files-found: ignore

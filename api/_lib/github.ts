@@ -154,14 +154,24 @@ export async function listDir(path: string): Promise<{ name: string; type: strin
   }
 }
 
-export async function dispatchWorkflow(jobId: string, secretName: string): Promise<void> {
+export async function dispatchWorkflow(jobId: string, secretName: string): Promise<'workflow_dispatch' | 'repository_dispatch'> {
   const env = ghEnv();
+  // Preferred: direct workflow dispatch (needs Actions: write on the token)
   const res = await ghFetch(`/repos/${env.owner}/${env.repo}/actions/workflows/android-build.yml/dispatches`, {
     method: 'POST',
     body: JSON.stringify({ ref: await defaultBranch(), inputs: { jobId, secretName } }),
   });
-  if (res.status === 204) return;
-  await assertOk(res, 'workflow dispatch (check that the token has Actions: Read and write)');
+  if (res.status === 204) return 'workflow_dispatch';
+  if (res.status !== 403) await assertOk(res, 'workflow dispatch');
+
+  // Fallback: repository_dispatch needs only Contents: write
+  const fallback = await ghFetch(`/repos/${env.owner}/${env.repo}/dispatches`, {
+    method: 'POST',
+    body: JSON.stringify({ event_type: 'web2apk-build', client_payload: { jobId, secretName } }),
+  });
+  if (fallback.status === 204) return 'repository_dispatch';
+  await assertOk(fallback, 'repository dispatch (token needs Contents: write at minimum, or Actions: write)');
+  return 'repository_dispatch';
 }
 
 /** Latest workflow run whose run-name contains the job id. */

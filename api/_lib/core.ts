@@ -112,7 +112,17 @@ export async function createBuild(body: any, ownerKey: string | null): Promise<{
   const payload = encryptJson({ config: cfg, signing, files }, key);
 
   await gh.ensureJobsBranch();
-  await gh.setJobKeySecret(secretNameForJob(jobId), key);
+  try {
+    await gh.setJobKeySecret(secretNameForJob(jobId), key);
+  } catch (e) {
+    if (e instanceof GhError && (e.status === 403 || e.status === 404)) {
+      throw new HttpError(
+        502,
+        'The GitHub token cannot write Actions secrets. Add the "Secrets: Read and write" repository permission to the fine-grained PAT (Settings → Developer settings → Personal access tokens), then retry.'
+      );
+    }
+    throw e;
+  }
   await gh.putFile(`jobs/${jobId}/payload.enc`, payload, `web2apk: stage payload for ${jobId}`);
   await gh.putFile(
     `jobs/${jobId}/index.json`,

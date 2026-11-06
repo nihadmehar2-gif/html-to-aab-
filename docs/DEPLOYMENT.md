@@ -14,7 +14,8 @@ exactly why the pipeline dispatches to GitHub Actions.
    | Permission | Level | Why |
    | --- | --- | --- |
    | Contents | Read and write | push encrypted payloads to the `jobs` branch, run workflow |
-   | Actions | Read and write | dispatch workflow, set/delete per-job secrets, read artifacts |
+   | Actions | Read and write | dispatch workflow, cancel runs, read artifacts |
+   | Secrets | Read and write | deliver the per-job payload key as an Actions secret (never readable via API, only by the workflow) |
    | Metadata | Read | default |
 4. Generate, copy the token (`github_pat_…`). **You will paste it only into your hosting platform's env vars — never into code.**
 
